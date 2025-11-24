@@ -71,17 +71,18 @@ def absolut_path(file):
     return path.join(repo_path, file)
 
 def data(tool):
-    global tool_found, tool_install, tool_name, tool_categorie, tool_description, tool_path, tool_exec, section, sect # tool_tag
+    global tool_found, tool_install, tool_name, tool_categorie, tool_description, tool_path, tool_exec, bin_path, section, sect # tool_tag
     tool_found = False
     for section in sect:
         if tool.lower() == section.lower():
             tool_found = True
             tool_name = Config.get(section, "name")
+            bin_path = "/usr/bin/{tool_name}"
             tool_path = Config.get(section, "path", fallback=None)
+            tool_categorie = Config.get(section, "categorie")
             exec_cmd = Config.get(section, "exec")
 #           tool_tag = Config.get(section, "tag")
             tool_install = Config.get(section, "install")
-            tool_categorie = Config.get(section, "categorie")
             tool_description = Config.get(section, "description")
             if tool_path:
                 tool_path = absolut_path(tool_path)
@@ -92,7 +93,7 @@ def data(tool):
 
 def exec_tool():
     print(f"[+] Tool {tool_name} selectionné")
-    if tool_path != "":
+    if tool_path != "" and tool_path != None:
         print(f"[+] Chemin du tool : {tool_path}")
     else:
         print(f"[+] Chemin du tool : {tool_exec}")
@@ -114,19 +115,20 @@ def install_tool():
         replace = input(f"[-] Veux-tu ajouter $HOME/.local/bin/{tool_name} ? (y/N) ")
         if replace.lower() in ["o", "y"]:
             print(f"[+] ajout de {bin_path}...")
+            print(f"ln -sfv {tool_exec} $HOME/.local/bin/{tool_name}")
             replace_bin = f"ln -sfv {tool_exec} $HOME/.local/bin/{tool_name}"
             subprocess.run(replace_bin, shell=True)
             print(f"[+] Fin de l'installation de {tool_name}")
 
-def suggestion():
-    print(f"[-] Tool {args.use} non trouvé")
+def suggestion(args):
+    print(f"[-] Tool {args} non trouvé")
     print(f"[-] Suggestion possible :")
     for section in sect:
-        if args.use.lower() in section.lower():
+        if args.lower() in section.lower():
             data(section)
             print(f"[+] {section}\n\tdescription : {tool_description}")
-        if not tool_found:
-            print(f"[-] Pas de suggestion")
+    if not tool_found:
+        print(f"[-] Pas de suggestion")
 # ================================= FUNCTION ================================= #
 # ================================= FUNCTION ================================= #
 # ================================= FUNCTION ================================= #
@@ -170,7 +172,7 @@ else:
 
 os = detect_os()
 
-if not args.list and not args.install and not args.search and not args.use and not args.categorie and not args.personnalize: #and not args.tag
+if not args.list and not args.install and not args.search and not args.use and not args.categorie and not args.personnalize and not args.remove: #and not args.tag
     print(f"[!] Merci de bien vouloir utiliser une option")
     print("""
 usage: main.py [-h] [-s SEARCH] [-i INSTALL] [-l LIST] [-u USE] [-c CATEGORIE]
@@ -242,7 +244,7 @@ if args.search:
             print(f"[+] {section}\n {tool_description}")
             tool_found = True
     if not tool_found:
-      suggestion()
+      suggestion(args.search)
 # ================ SEARCH ================ #
 
 
@@ -251,19 +253,22 @@ if args.use:
     data(args.use)
 
     if tool_found:
-        if tool_path:
-            if path.exists(tool_path):
+        if tool_exec:
+            if path.exists(tool_exec):
                 chdir(tool_path)
                 exec_tool()
             else:
-                print(f"[-] Chemin introuvable")
-                install = input(f"[-] Veux-tu installer {tool_name} ? (y/N) ")
+                print(f"[-] Chemin introuvable {tool_exec}")
+                if path.exists(bin_path):
+                    print(f"[+] Uitlisation de {bin_path}")
+                else:
+                    install = input(f"[-] Veux-tu installer {tool_name} ? (y/N) ")
                 if install.lower() in ["o", "y"]:
                     args.install = args.use
         else:
             exec_tool()
     else:
-      suggestion()
+      suggestion(args.use)
 # ================ USE ================ #
 
 
@@ -287,7 +292,7 @@ if args.install:
           install_tool()
         
     else:
-      suggestion()
+      suggestion(args.install)
 # ================ INSTALL ================ #
 
 
@@ -295,12 +300,15 @@ if args.install:
 if args.remove:
   data(args.remove)
   if tool_found:
-    print(f"suppression de {args.remove}")
-    commande = "rm -rf {tool_path}"
-    print(f"Execution de la commande {commande}")
-    subprocess.run(commande, shell=True)
+    if path.exists(tool_path):
+        print(f"[+] Suppression de {args.remove}")
+        commande = f"rm -rf {tool_path}"
+        print(f"[+] Execution de la commande {commande}")
+        subprocess.run(commande, shell=True)
+    else:
+        print(f"[+] Le tool n'existe pas")
   else:
-    suggestion()
+    suggestion(args.remove)
 # ================ REMOVE ================ #
 
 
@@ -312,7 +320,7 @@ if args.list:
         data(section)
         print(f"[+] {section}\n\tdescription : {tool_description}")
   else:
-    suggestion()
+    suggestion(args.list)
     
 # ================ LIST FUNCTION ================ #
 
